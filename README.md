@@ -7,11 +7,11 @@
 
 API REST em **Laravel** para agenda de **clientes** e **atendimentos** — portfólio no mesmo espírito do [CRUD de clientes](https://github.com/GeovanaCH/crud-clientes) (SQL Server, Docker, testes), trocando PHP puro por Laravel.
 
-> **Status:** marco 1 — scaffold (Laravel + Docker + SQL Server). Auth, CRUD e OpenAPI ainda não estão implementados.
+> **Status:** marco 2 — autenticação com Laravel Sanctum (register / login / logout / me). CRUD de clientes e atendimentos ainda não implementados.
 
 ## Stack
 
-Laravel 13 (API) · PHP 8.3 · SQL Server 2022 · PDO `sqlsrv` · Apache · Docker Compose
+Laravel 13 (API) · Sanctum · PHP 8.3 · SQL Server 2022 · PDO `sqlsrv` · Apache · Docker Compose
 
 ## Como rodar
 
@@ -24,9 +24,10 @@ cd api-agenda
 cp .env.example .env
 docker compose up -d --build
 
-# Instala dependências e gera a APP_KEY (obrigatória no Laravel)
+# Instala dependências, gera a APP_KEY e cria as tabelas
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate
 ```
 
 Smoke test:
@@ -38,20 +39,82 @@ curl http://localhost:8080/api/health
 
 Para abrir o banco em um cliente SQL: host `localhost`, porta `1433`, usuário `sa`, senha do `.env` e "Trust server certificate" marcado.
 
+## Autenticação (Sanctum)
+
+Tokens Bearer. Envie `Accept: application/json` e, nas rotas protegidas, `Authorization: Bearer <token>`.
+
+### Registrar
+
+```bash
+curl -s -X POST http://localhost:8080/api/register \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Geovana Chaves",
+    "email": "geovana@example.com",
+    "password": "Password1!",
+    "password_confirmation": "Password1!"
+  }'
+```
+
+Resposta `201`: `user`, `token`, `token_type` (`Bearer`).
+
+### Login
+
+```bash
+curl -s -X POST http://localhost:8080/api/login \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "geovana@example.com",
+    "password": "Password1!"
+  }'
+```
+
+### Usuário autenticado
+
+```bash
+TOKEN="cole_o_token_aqui"
+
+curl -s http://localhost:8080/api/me \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Logout (invalida o token atual)
+
+```bash
+curl -s -X POST http://localhost:8080/api/logout \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Erros de validação seguem o formato Laravel (`message` + `errors` por campo). Rotas protegidas sem token respondem `401`.
+
+## Testes
+
+```bash
+docker compose exec app php artisan test
+# ou, sem Docker (SQLite em memória via phpunit.xml):
+php artisan test
+```
+
 ## Estrutura (resumo)
 
 ```
-app/                 código da aplicação
-routes/api.php       rotas da API (health por enquanto)
-docker/php           imagem Apache + PHP + drivers sqlsrv
-docker/sqlserver     script de criação do banco
-docker-compose.yml   app + SQL Server 2022
+app/Http/Controllers   AuthController
+app/Http/Requests/Auth RegisterRequest, LoginRequest
+app/Http/Resources     UserResource
+routes/api.php         health + auth
+docker/php             imagem Apache + PHP + drivers sqlsrv
+docker/sqlserver       script de criação do banco
+docker-compose.yml     app + SQL Server 2022
 ```
 
 ## Próximos marcos
 
 1. ~~Scaffold — Laravel + Docker + `.env.example` + README~~
-2. **Auth** — Sanctum (register / login / logout / me) + testes
+2. ~~Auth — Sanctum (register / login / logout / me) + testes~~
 3. **Clientes** — migration, model, Form Request, resource, CRUD + soft delete + busca
 4. **Atendimentos** — relacionamento, filtros por status/período, CRUD
 5. **Qualidade** — testes de feature, CI no Actions, OpenAPI
