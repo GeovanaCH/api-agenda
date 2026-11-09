@@ -5,18 +5,23 @@
 ![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
 ![SQL Server](https://img.shields.io/badge/SQL%20Server-2022-CC2927?logo=microsoftsqlserver&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-85EA2D?logo=openapiinitiative&logoColor=white)
 
 API REST em **Laravel** para agenda de **clientes** e **atendimentos** — portfólio no mesmo espírito do [CRUD de clientes](https://github.com/GeovanaCH/crud-clientes) (SQL Server, Docker, testes), trocando PHP puro por Laravel.
 
-> **Status:** marco 5 — CI (GitHub Actions) + OpenAPI (L5-Swagger). Próximo: deploy / seed demo.
+> **Demo principal:** Docker local (SQL Server 2022). Free tiers de PaaS quase nunca oferecem SQL Server — ver [docs/deploy.md](docs/deploy.md).
+
+## O problema
+
+Registrar clientes e seus atendimentos com autenticação por token, validação (incluindo CPF), exclusão lógica, busca/paginação e documentação OpenAPI — uma API pronta para integrar com qualquer front.
 
 ## Stack
 
-Laravel 13 (API) · Sanctum · PHP 8.3 · SQL Server 2022 · PDO `sqlsrv` · Apache · Docker Compose · PHPUnit · OpenAPI
+Laravel 13 (API) · Sanctum · PHP 8.3 · SQL Server 2022 · PDO `sqlsrv` · Apache · Docker Compose · PHPUnit · L5-Swagger (OpenAPI) · GitHub Actions
 
-## Como rodar
+## Como rodar (Docker)
 
-**Requisitos:** Docker com Docker Compose e cerca de **2 GB de RAM** livres para o SQL Server.
+**Requisitos:** Docker Compose e cerca de **2 GB de RAM** livres para o SQL Server.
 
 ```bash
 git clone https://github.com/GeovanaCH/api-agenda.git
@@ -25,246 +30,138 @@ cd api-agenda
 cp .env.example .env
 docker compose up -d --build
 
-# Instala dependências, gera a APP_KEY e cria as tabelas
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate
+docker compose exec app php artisan migrate --seed
 ```
 
-Smoke test:
+| Recurso | URL |
+|---------|-----|
+| Health | http://localhost:8080/api/health |
+| OpenAPI (Swagger UI) | http://localhost:8080/api/documentation |
+| SQL Server | `localhost:1433` · user `sa` · senha do `.env` · Trust server certificate |
+
+### Usuário demo (seed)
+
+| Campo | Valor |
+|-------|-------|
+| E-mail | `demo@api-agenda.test` |
+| Senha | `Password1!` |
+
+O seed também cria 2 clientes e 2 atendimentos de exemplo.
+
+## Demo rápida (login → cliente → atendimento)
 
 ```bash
-curl http://localhost:8080/api/health
-# {"status":"ok","service":"api-agenda"}
-```
-
-Para abrir o banco em um cliente SQL: host `localhost`, porta `1433`, usuário `sa`, senha do `.env` e "Trust server certificate" marcado.
-
-## Autenticação (Sanctum)
-
-Tokens Bearer. Envie `Accept: application/json` e, nas rotas protegidas, `Authorization: Bearer <token>`.
-
-### Registrar
-
-```bash
-curl -s -X POST http://localhost:8080/api/register \
+# 1) Login
+TOKEN=$(curl -s -X POST http://localhost:8080/api/login \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Geovana Chaves",
-    "email": "geovana@example.com",
-    "password": "Password1!",
-    "password_confirmation": "Password1!"
-  }'
-```
+  -d '{"email":"demo@api-agenda.test","password":"Password1!"}' \
+  | php -r 'echo json_decode(stream_get_contents(STDIN))->token;')
 
-Resposta `201`: `user`, `token`, `token_type` (`Bearer`).
+echo "TOKEN=$TOKEN"
 
-### Login
-
-```bash
-curl -s -X POST http://localhost:8080/api/login \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "geovana@example.com",
-    "password": "Password1!"
-  }'
-```
-
-### Usuário autenticado / logout
-
-```bash
-TOKEN="cole_o_token_aqui"
-
-curl -s http://localhost:8080/api/me \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -s -X POST http://localhost:8080/api/logout \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-## Clientes (auth)
-
-Campos: `nome`, `email`, `cpf` (11 dígitos ou formatado), `telefone` (opcional). Soft delete em `excluido_em`. E-mail e CPF únicos entre clientes ativos. Busca: `?q=` (nome, e-mail ou CPF). Paginação: `?per_page=` (padrão 15).
-
-### Listar / buscar
-
-```bash
-curl -s "http://localhost:8080/api/clientes?q=Ana&per_page=10" \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Criar
-
-```bash
+# 2) Criar cliente
 curl -s -X POST http://localhost:8080/api/clientes \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "nome": "Ana Paula",
-    "email": "ana@example.com",
-    "cpf": "529.982.247-25",
-    "telefone": "(11) 98888-7777"
-  }'
-```
-
-### Ver / atualizar / excluir
-
-```bash
-curl -s http://localhost:8080/api/clientes/1 \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -s -X PUT http://localhost:8080/api/clientes/1 \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "nome": "Ana Paula Silva",
-    "email": "ana@example.com",
-    "cpf": "529.982.247-25",
-    "telefone": "(11) 97777-6666"
+    "nome": "Carla Mendes",
+    "email": "carla@example.com",
+    "cpf": "853.513.468-93",
+    "telefone": "(11) 95555-4444"
   }'
 
-curl -s -X PATCH http://localhost:8080/api/clientes/1 \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"telefone": "(11) 96666-5555"}'
-
-curl -s -X DELETE http://localhost:8080/api/clientes/1 \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-# 204 No Content
-```
-
-## Atendimentos (auth)
-
-Campos: `cliente_id`, `data_hora`, `status` (`agendado` | `concluido` | `cancelado`), `assunto`, `observacoes` (opcional). Soft delete em `excluido_em`. Filtros: `cliente_id`, `status`, `data_inicio`, `data_fim`. Paginação: `?per_page=` (padrão 15).
-
-### Listar / filtrar
-
-```bash
-curl -s "http://localhost:8080/api/atendimentos?cliente_id=1&status=agendado&data_inicio=2026-11-01&data_fim=2026-11-30" \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Criar
-
-```bash
+# 3) Criar atendimento (ajuste cliente_id se necessário)
 curl -s -X POST http://localhost:8080/api/atendimentos \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "cliente_id": 1,
-    "data_hora": "2026-11-20 14:30:00",
+    "data_hora": "2026-12-01 09:00:00",
     "status": "agendado",
-    "assunto": "Primeira consulta",
-    "observacoes": "Trazer documentos"
-  }'
-```
-
-### Ver / atualizar / excluir
-
-```bash
-curl -s http://localhost:8080/api/atendimentos/1 \
-  -H "Accept: application/json" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -s -X PUT http://localhost:8080/api/atendimentos/1 \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "cliente_id": 1,
-    "data_hora": "2026-11-20 15:00:00",
-    "status": "concluido",
-    "assunto": "Primeira consulta",
-    "observacoes": "Finalizado"
+    "assunto": "Avaliação inicial",
+    "observacoes": "Primeiro contato"
   }'
 
-curl -s -X PATCH http://localhost:8080/api/atendimentos/1 \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"status": "cancelado"}'
-
-curl -s -X DELETE http://localhost:8080/api/atendimentos/1 \
+# 4) Listar
+curl -s "http://localhost:8080/api/clientes?q=Carla" \
   -H "Accept: application/json" \
   -H "Authorization: Bearer $TOKEN"
-# 204 No Content
-```
 
-### Aninhado no cliente
-
-```bash
-curl -s "http://localhost:8080/api/clientes/1/atendimentos?status=agendado" \
+curl -s "http://localhost:8080/api/atendimentos?status=agendado" \
   -H "Accept: application/json" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Erros de validação seguem o formato Laravel (`message` + `errors` por campo). Rotas protegidas sem token respondem `401`.
+## Endpoints
 
-## Documentação OpenAPI
+### Auth
+- `POST /api/register` · `POST /api/login` · `POST /api/logout` · `GET /api/me`
 
-Swagger UI (L5-Swagger):
+### Clientes (auth)
+- `GET/POST /api/clientes` · `GET/PUT|PATCH/DELETE /api/clientes/{id}`
+- Busca: `?q=` (nome, e-mail ou CPF) · paginação: `?per_page=`
+- Soft delete (`excluido_em`); e-mail/CPF únicos entre ativos; CPF com dígitos verificadores
 
-```text
-http://localhost:8080/api/documentation
-```
+### Atendimentos (auth)
+- `GET/POST /api/atendimentos` · `GET/PUT|PATCH/DELETE /api/atendimentos/{id}`
+- Filtros: `cliente_id`, `status` (`agendado`\|`concluido`\|`cancelado`), `data_inicio`, `data_fim`
+- Aninhado: `GET /api/clientes/{id}/atendimentos`
 
-No Swagger, use **Authorize** com o token Sanctum (`Bearer <token>`). Para regenerar o JSON:
+Erros de validação no formato Laravel (`message` + `errors`). Sem token → `401`.
+
+## OpenAPI
+
+Swagger UI: **http://localhost:8080/api/documentation**
+
+Use **Authorize** com `Bearer <token>`. Regenerar:
 
 ```bash
 docker compose exec app php artisan l5-swagger:generate
-# ou localmente:
-php artisan l5-swagger:generate
 ```
-
-Anotações em `app/OpenApi/` (auth, clientes, atendimentos). Com `L5_SWAGGER_GENERATE_ALWAYS=true` no `.env`, a UI regenera ao abrir.
 
 ## Testes e CI
 
-PHPUnit roda em memória com SQLite (`phpunit.xml`) — sem SQL Server no CI.
+SQLite em memória no PHPUnit (sem SQL Server no CI). Badge acima aponta para o workflow.
 
 ```bash
 docker compose exec app php artisan test
-# ou, sem Docker:
+# ou localmente:
 php artisan test
 ```
 
-GitHub Actions (`.github/workflows/tests.yml`) executa os testes e gera o OpenAPI a cada push/PR.
+## Deploy / URL pública
 
-## Estrutura (resumo)
+Não há URL pública automática neste repositório: o banco de estudo é **SQL Server**, e planos gratuitos de Railway/Render/Fly tipicamente **não** incluem SQL Server.
+
+- Demo suportada: **Docker local** (seção acima)
+- Opções futuras (VPS, Azure SQL, etc.): [docs/deploy.md](docs/deploy.md)
+
+## Estrutura
 
 ```
-app/Enums              AtendimentoStatus
-app/Http/Controllers   Auth, Cliente, Atendimento
-app/Http/Requests      Auth/*, Cliente/*, Atendimento/*
-app/Http/Resources     User, Cliente, Atendimento
-app/Models             User, Cliente, Atendimento
-app/OpenApi            Spec OpenAPI (L5-Swagger)
-app/Support/Cpf.php    limpeza e dígitos verificadores
-routes/api.php         health + auth + clientes + atendimentos
-.github/workflows      CI PHPUnit
-docker/                Apache/PHP + SQL Server
+app/Http              Controllers, Form Requests, Resources
+app/Models            User, Cliente, Atendimento
+app/OpenApi           Spec L5-Swagger
+app/Support           Cpf
+database/seeders      DemoSeeder (usuário + dados de exemplo)
+docker/               Apache/PHP + sqlsrv · init SQL Server
+.github/workflows     CI PHPUnit + generate OpenAPI
+docs/deploy.md        Notas de deploy
 ```
 
-## Próximos marcos
+## Marcos
 
-1. ~~Scaffold — Laravel + Docker + `.env.example` + README~~
-2. ~~Auth — Sanctum (register / login / logout / me) + testes~~
-3. ~~Clientes — migration, model, Form Request, resource, CRUD + soft delete + busca~~
-4. ~~Atendimentos — relacionamento, filtros por status/período, CRUD~~
-5. ~~Qualidade — testes de feature, CI no Actions, OpenAPI~~
-6. **Portfólio** — deploy, seed demo, README com curl e badge de testes
+1. ~~Scaffold — Laravel + Docker + README~~
+2. ~~Auth — Sanctum + testes~~
+3. ~~Clientes — CRUD + soft delete + CPF~~
+4. ~~Atendimentos — filtros + rota aninhada~~
+5. ~~Qualidade — CI + OpenAPI~~
+6. ~~Portfólio — seed demo + README + notas de deploy~~
 
 ## Licença
 
