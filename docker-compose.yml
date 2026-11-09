@@ -1,0 +1,62 @@
+services:
+  app:
+    build: ./docker/php
+    container_name: api_agenda_app
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html
+    env_file:
+      - .env
+    environment:
+      DB_CONNECTION: sqlsrv
+      DB_HOST: db
+      DB_PORT: 1433
+      DB_DATABASE: ${DB_DATABASE:-api_agenda}
+      DB_USERNAME: sa
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_ENCRYPT: "yes"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: api_agenda_db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # Roda uma vez a cada "up": cria o banco (idempotente) e finaliza.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: api_agenda_db_init
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./docker/sqlserver/init.sql:/init.sql:ro
+    entrypoint:
+      [
+        "/bin/bash",
+        "-c",
+        "/opt/mssql-tools18/bin/sqlcmd -C -I -S db -U sa -P \"$$DB_PASSWORD\" -b -i /init.sql",
+      ]
+    restart: "no"
+
+volumes:
+  sqlserver_data:
