@@ -7,7 +7,7 @@
 
 API REST em **Laravel** para agenda de **clientes** e **atendimentos** — portfólio no mesmo espírito do [CRUD de clientes](https://github.com/GeovanaCH/crud-clientes) (SQL Server, Docker, testes), trocando PHP puro por Laravel.
 
-> **Status:** marco 2 — autenticação com Laravel Sanctum (register / login / logout / me). CRUD de clientes e atendimentos ainda não implementados.
+> **Status:** marco 3 — CRUD de clientes (soft delete, busca, CPF). Atendimentos ainda não implementados.
 
 ## Stack
 
@@ -71,7 +71,7 @@ curl -s -X POST http://localhost:8080/api/login \
   }'
 ```
 
-### Usuário autenticado
+### Usuário autenticado / logout
 
 ```bash
 TOKEN="cole_o_token_aqui"
@@ -79,14 +79,67 @@ TOKEN="cole_o_token_aqui"
 curl -s http://localhost:8080/api/me \
   -H "Accept: application/json" \
   -H "Authorization: Bearer $TOKEN"
-```
 
-### Logout (invalida o token atual)
-
-```bash
 curl -s -X POST http://localhost:8080/api/logout \
   -H "Accept: application/json" \
   -H "Authorization: Bearer $TOKEN"
+```
+
+## Clientes (auth)
+
+Campos: `nome`, `email`, `cpf` (11 dígitos ou formatado), `telefone` (opcional). Soft delete em `excluido_em`. E-mail e CPF únicos entre clientes ativos. Busca: `?q=` (nome, e-mail ou CPF). Paginação: `?per_page=` (padrão 15).
+
+### Listar / buscar
+
+```bash
+curl -s "http://localhost:8080/api/clientes?q=Ana&per_page=10" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Criar
+
+```bash
+curl -s -X POST http://localhost:8080/api/clientes \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "nome": "Ana Paula",
+    "email": "ana@example.com",
+    "cpf": "529.982.247-25",
+    "telefone": "(11) 98888-7777"
+  }'
+```
+
+### Ver / atualizar / excluir
+
+```bash
+curl -s http://localhost:8080/api/clientes/1 \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -s -X PUT http://localhost:8080/api/clientes/1 \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "nome": "Ana Paula Silva",
+    "email": "ana@example.com",
+    "cpf": "529.982.247-25",
+    "telefone": "(11) 97777-6666"
+  }'
+
+curl -s -X PATCH http://localhost:8080/api/clientes/1 \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"telefone": "(11) 96666-5555"}'
+
+curl -s -X DELETE http://localhost:8080/api/clientes/1 \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+# 204 No Content
 ```
 
 Erros de validação seguem o formato Laravel (`message` + `errors` por campo). Rotas protegidas sem token respondem `401`.
@@ -102,20 +155,20 @@ php artisan test
 ## Estrutura (resumo)
 
 ```
-app/Http/Controllers   AuthController
-app/Http/Requests/Auth RegisterRequest, LoginRequest
-app/Http/Resources     UserResource
-routes/api.php         health + auth
-docker/php             imagem Apache + PHP + drivers sqlsrv
-docker/sqlserver       script de criação do banco
-docker-compose.yml     app + SQL Server 2022
+app/Http/Controllers   AuthController, ClienteController
+app/Http/Requests      Auth/*, Cliente/*
+app/Http/Resources     UserResource, ClienteResource
+app/Support/Cpf.php    limpeza e dígitos verificadores
+app/Rules/ValidCpf.php regra de validação
+routes/api.php         health + auth + clientes
+docker/                Apache/PHP + SQL Server
 ```
 
 ## Próximos marcos
 
 1. ~~Scaffold — Laravel + Docker + `.env.example` + README~~
 2. ~~Auth — Sanctum (register / login / logout / me) + testes~~
-3. **Clientes** — migration, model, Form Request, resource, CRUD + soft delete + busca
+3. ~~Clientes — migration, model, Form Request, resource, CRUD + soft delete + busca~~
 4. **Atendimentos** — relacionamento, filtros por status/período, CRUD
 5. **Qualidade** — testes de feature, CI no Actions, OpenAPI
 6. **Portfólio** — deploy, seed demo, README com curl e badge de testes
