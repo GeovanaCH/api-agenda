@@ -1,5 +1,6 @@
 # API Agenda
 
+![Testes](https://github.com/GeovanaCH/api-agenda/actions/workflows/tests.yml/badge.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.3-777BB4?logo=php&logoColor=white)
 ![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
 ![SQL Server](https://img.shields.io/badge/SQL%20Server-2022-CC2927?logo=microsoftsqlserver&logoColor=white)
@@ -7,11 +8,11 @@
 
 API REST em **Laravel** para agenda de **clientes** e **atendimentos** — portfólio no mesmo espírito do [CRUD de clientes](https://github.com/GeovanaCH/crud-clientes) (SQL Server, Docker, testes), trocando PHP puro por Laravel.
 
-> **Status:** marco 4 — CRUD de atendimentos (filtros, soft delete, rota aninhada). Próximo: qualidade (CI / OpenAPI).
+> **Status:** marco 5 — CI (GitHub Actions) + OpenAPI (L5-Swagger). Próximo: deploy / seed demo.
 
 ## Stack
 
-Laravel 13 (API) · Sanctum · PHP 8.3 · SQL Server 2022 · PDO `sqlsrv` · Apache · Docker Compose
+Laravel 13 (API) · Sanctum · PHP 8.3 · SQL Server 2022 · PDO `sqlsrv` · Apache · Docker Compose · PHPUnit · OpenAPI
 
 ## Como rodar
 
@@ -211,13 +212,35 @@ curl -s "http://localhost:8080/api/clientes/1/atendimentos?status=agendado" \
 
 Erros de validação seguem o formato Laravel (`message` + `errors` por campo). Rotas protegidas sem token respondem `401`.
 
-## Testes
+## Documentação OpenAPI
+
+Swagger UI (L5-Swagger):
+
+```text
+http://localhost:8080/api/documentation
+```
+
+No Swagger, use **Authorize** com o token Sanctum (`Bearer <token>`). Para regenerar o JSON:
+
+```bash
+docker compose exec app php artisan l5-swagger:generate
+# ou localmente:
+php artisan l5-swagger:generate
+```
+
+Anotações em `app/OpenApi/` (auth, clientes, atendimentos). Com `L5_SWAGGER_GENERATE_ALWAYS=true` no `.env`, a UI regenera ao abrir.
+
+## Testes e CI
+
+PHPUnit roda em memória com SQLite (`phpunit.xml`) — sem SQL Server no CI.
 
 ```bash
 docker compose exec app php artisan test
-# ou, sem Docker (SQLite em memória via phpunit.xml):
+# ou, sem Docker:
 php artisan test
 ```
+
+GitHub Actions (`.github/workflows/tests.yml`) executa os testes e gera o OpenAPI a cada push/PR.
 
 ## Estrutura (resumo)
 
@@ -227,8 +250,10 @@ app/Http/Controllers   Auth, Cliente, Atendimento
 app/Http/Requests      Auth/*, Cliente/*, Atendimento/*
 app/Http/Resources     User, Cliente, Atendimento
 app/Models             User, Cliente, Atendimento
+app/OpenApi            Spec OpenAPI (L5-Swagger)
 app/Support/Cpf.php    limpeza e dígitos verificadores
 routes/api.php         health + auth + clientes + atendimentos
+.github/workflows      CI PHPUnit
 docker/                Apache/PHP + SQL Server
 ```
 
@@ -238,7 +263,7 @@ docker/                Apache/PHP + SQL Server
 2. ~~Auth — Sanctum (register / login / logout / me) + testes~~
 3. ~~Clientes — migration, model, Form Request, resource, CRUD + soft delete + busca~~
 4. ~~Atendimentos — relacionamento, filtros por status/período, CRUD~~
-5. **Qualidade** — testes de feature, CI no Actions, OpenAPI
+5. ~~Qualidade — testes de feature, CI no Actions, OpenAPI~~
 6. **Portfólio** — deploy, seed demo, README com curl e badge de testes
 
 ## Licença
