@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['nome', 'email', 'cpf', 'telefone'])]
@@ -16,6 +17,14 @@ class Cliente extends Model
     use HasFactory, SoftDeletes;
 
     public const DELETED_AT = 'excluido_em';
+
+    /**
+     * @return HasMany<Atendimento, $this>
+     */
+    public function atendimentos(): HasMany
+    {
+        return $this->hasMany(Atendimento::class);
+    }
 
     /**
      * Search by nome, email, or cpf (partial match).

@@ -7,7 +7,7 @@
 
 API REST em **Laravel** para agenda de **clientes** e **atendimentos** — portfólio no mesmo espírito do [CRUD de clientes](https://github.com/GeovanaCH/crud-clientes) (SQL Server, Docker, testes), trocando PHP puro por Laravel.
 
-> **Status:** marco 3 — CRUD de clientes (soft delete, busca, CPF). Atendimentos ainda não implementados.
+> **Status:** marco 4 — CRUD de atendimentos (filtros, soft delete, rota aninhada). Próximo: qualidade (CI / OpenAPI).
 
 ## Stack
 
@@ -142,6 +142,73 @@ curl -s -X DELETE http://localhost:8080/api/clientes/1 \
 # 204 No Content
 ```
 
+## Atendimentos (auth)
+
+Campos: `cliente_id`, `data_hora`, `status` (`agendado` | `concluido` | `cancelado`), `assunto`, `observacoes` (opcional). Soft delete em `excluido_em`. Filtros: `cliente_id`, `status`, `data_inicio`, `data_fim`. Paginação: `?per_page=` (padrão 15).
+
+### Listar / filtrar
+
+```bash
+curl -s "http://localhost:8080/api/atendimentos?cliente_id=1&status=agendado&data_inicio=2026-11-01&data_fim=2026-11-30" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Criar
+
+```bash
+curl -s -X POST http://localhost:8080/api/atendimentos \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "cliente_id": 1,
+    "data_hora": "2026-11-20 14:30:00",
+    "status": "agendado",
+    "assunto": "Primeira consulta",
+    "observacoes": "Trazer documentos"
+  }'
+```
+
+### Ver / atualizar / excluir
+
+```bash
+curl -s http://localhost:8080/api/atendimentos/1 \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -s -X PUT http://localhost:8080/api/atendimentos/1 \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "cliente_id": 1,
+    "data_hora": "2026-11-20 15:00:00",
+    "status": "concluido",
+    "assunto": "Primeira consulta",
+    "observacoes": "Finalizado"
+  }'
+
+curl -s -X PATCH http://localhost:8080/api/atendimentos/1 \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"status": "cancelado"}'
+
+curl -s -X DELETE http://localhost:8080/api/atendimentos/1 \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+```
+
+### Aninhado no cliente
+
+```bash
+curl -s "http://localhost:8080/api/clientes/1/atendimentos?status=agendado" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 Erros de validação seguem o formato Laravel (`message` + `errors` por campo). Rotas protegidas sem token respondem `401`.
 
 ## Testes
@@ -155,12 +222,13 @@ php artisan test
 ## Estrutura (resumo)
 
 ```
-app/Http/Controllers   AuthController, ClienteController
-app/Http/Requests      Auth/*, Cliente/*
-app/Http/Resources     UserResource, ClienteResource
+app/Enums              AtendimentoStatus
+app/Http/Controllers   Auth, Cliente, Atendimento
+app/Http/Requests      Auth/*, Cliente/*, Atendimento/*
+app/Http/Resources     User, Cliente, Atendimento
+app/Models             User, Cliente, Atendimento
 app/Support/Cpf.php    limpeza e dígitos verificadores
-app/Rules/ValidCpf.php regra de validação
-routes/api.php         health + auth + clientes
+routes/api.php         health + auth + clientes + atendimentos
 docker/                Apache/PHP + SQL Server
 ```
 
@@ -169,7 +237,7 @@ docker/                Apache/PHP + SQL Server
 1. ~~Scaffold — Laravel + Docker + `.env.example` + README~~
 2. ~~Auth — Sanctum (register / login / logout / me) + testes~~
 3. ~~Clientes — migration, model, Form Request, resource, CRUD + soft delete + busca~~
-4. **Atendimentos** — relacionamento, filtros por status/período, CRUD
+4. ~~Atendimentos — relacionamento, filtros por status/período, CRUD~~
 5. **Qualidade** — testes de feature, CI no Actions, OpenAPI
 6. **Portfólio** — deploy, seed demo, README com curl e badge de testes
 

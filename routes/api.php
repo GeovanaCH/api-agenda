@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AtendimentoController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClienteController;
 use Illuminate\Support\Facades\Route;
@@ -19,4 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::apiResource('clientes', ClienteController::class);
+    Route::get('clientes/{cliente}/atendimentos', [AtendimentoController::class, 'indexByCliente']);
+
+    Route::apiResource('atendimentos', AtendimentoController::class);
 });
